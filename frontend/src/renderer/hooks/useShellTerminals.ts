@@ -313,7 +313,9 @@ export function useCloseShellTerminal(hostId?: HostId) {
 		},
 		onMutate: async (handleId) => {
 			const hostKey = closingHostKey(hostId);
-			closingShellHandles.set(hostKey, new Set(closingShellHandles.get(hostKey)).add(handleId));
+			let closing = closingShellHandles.get(hostKey);
+			if (!closing) closingShellHandles.set(hostKey, (closing = new Set()));
+			closing.add(handleId);
 			const previous = queryClient.getQueryData<ShellTerminal[]>(queryKey);
 			const isCloud = Boolean(previous?.find((shell) => shell.handleId === handleId)?.cloud);
 			const removeClosedShell = () => {
@@ -341,7 +343,10 @@ export function useCloseShellTerminal(hostId?: HostId) {
 		// Settled, not success: a close that 404s means the daemon already lost
 		// the shell, and the stale tab still needs to disappear.
 		onSettled: (_data, _error, handleId, context) => {
-			closingShellHandles.get(closingHostKey(hostId))?.delete(handleId);
+			const hostKey = closingHostKey(hostId);
+			const closing = closingShellHandles.get(hostKey);
+			closing?.delete(handleId);
+			if (closing?.size === 0) closingShellHandles.delete(hostKey);
 			if (!context?.isCloud) void queryClient.invalidateQueries({ queryKey });
 		},
 	});
